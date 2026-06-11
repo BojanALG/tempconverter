@@ -1,0 +1,116 @@
+# ---------------------------------------------------------------------------
+# DATABASE: MySQL 8
+# ---------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: RootPass123
+            - name: MYSQL_DATABASE
+              value: tempconverter
+            - name: MYSQL_USER
+              value: tempuser
+            - name: MYSQL_PASSWORD
+              value: MojPassw0rd
+          ports:
+            - containerPort: 3306
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+spec:
+  selector:
+    app: db
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+# ---------------------------------------------------------------------------
+# APPLICATION: tempconverter (2 replicas, on different nodes)
+# ---------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: web
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: web
+          image: docker.io/bletica/tempconverter:latest
+          env:
+            - name: DB_HOST
+              value: db
+            - name: DB_NAME
+              value: tempconverter
+            - name: DB_USER
+              value: tempuser
+            - name: DB_PASS
+              value: MojPassw0rd
+            - name: STUDENT
+              value: Bojan
+            - name: COLLEGE
+              value: Algebra Bernays University
+          ports:
+            - containerPort: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 5000
+---
+# ---------------------------------------------------------------------------
+# INGRESS: exposes the app on port 80
+# ---------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80

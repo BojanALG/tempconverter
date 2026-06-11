@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: RootPass123
+      MYSQL_DATABASE: tempconverter
+      MYSQL_USER: tempuser
+      MYSQL_PASSWORD: MojPassw0rd
+    networks:
+      - appnet
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+  web:
+    image: docker.io/bletica/tempconverter:latest
+    ports:
+      - "80:5000"
+    environment:
+      DB_HOST: db
+      DB_NAME: tempconverter
+      DB_USER: tempuser
+      DB_PASS: MojPassw0rd
+      STUDENT: Bojan
+      COLLEGE: Algebra Bernays University
+    networks:
+      - appnet
+    deploy:
+      replicas: 2
+      placement:
+        max_replicas_per_node: 1
+      restart_policy:
+        condition: on-failure
+
+networks:
+  appnet:
+    driver: overlay
